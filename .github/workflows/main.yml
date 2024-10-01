@@ -1,0 +1,61 @@
+name: Build
+permissions:
+  contents: write
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the main branch
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-22.04
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - name: Checkout 🛎️
+        uses: actions/checkout@v4.1.7
+
+      - name: Install Dependencies 🔧
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install  innoextract g++-mingw-w64-i686-win32 wine wine32
+      - name: Build Executable 💾
+        run: i686-w64-mingw32-g++ -static -static-libgcc -static-libstdc++ unarc_cmd/unarc_cmd.cpp -o unarc_cmd
+
+      - name: Extract unarc.dll 🗃️
+        run: |
+          cd testdata
+          innoextract -e -I tmp/unarc.dll Setup.exe
+          md5_unarc=$(md5sum "tmp/unarc.dll"| cut -d " " -f1)
+          if ! [ "06a9571ff4789cf4aec6fda08992a9dc" == "$md5_unarc" ]; then echo "unarc.dll MD5 mismatch"; exit 2; fi
+          mv  tmp/unarc.dll ../ 
+          cd ../
+      - name: Run Tests 🔬
+        run: |
+          wine unarc_cmd.exe x -dptestdata\\tmp -apTheAllianceAliveHD_Data\\Managed\\ testdata/Setup-1.cdx
+          md5_csharp=$(md5sum "testdata/tmp/Assembly-CSharp.dll"| cut -d " " -f1)
+          if ! [ "dc367f75120c1305d759dfc7c31d1d8e" == "$md5_csharp" ]; then echo "MD5 mismatch"; exit 2; fi
+
+      - name: Upload artifact ⬆️
+        uses: actions/upload-artifact@v4
+        with:
+          name: unarc_cmd.zip
+          path: |
+            unarc_cmd.exe 
+            unarc.dll
+
+      - name: Bundle Build 📦
+        if: ${{ github.event_name == 'workflow_dispatch'  }}
+        run: zip unarc_cmd.zip unarc_cmd.exe unarc.dll
+
