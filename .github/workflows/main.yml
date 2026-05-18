@@ -56,6 +56,13 @@ jobs:
             unarc.dll
 
       - name: Bundle Build 📦
-        if: ${{ github.event_name == 'workflow_dispatch'  }}
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: zip unarc_cmd.zip unarc_cmd.exe unarc.dll
+
+      - name: Publish Release 🏷️
+        if: ${{ github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/') }}
+        uses: softprops/action-gh-release@v2
+        with:
+          files: unarc_cmd.zip
+          generate_release_notes: true
 
