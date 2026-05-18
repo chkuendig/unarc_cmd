@@ -15,13 +15,15 @@ typedef int __stdcall cbtype(char* what, int int1, int int2, char* str);
 typedef int __cdecl pFreeArcExtract(cbtype* callback, ...);
 
 // FreeArcExtract is cdecl varargs: (callback, p1, p2, ..., pN, nullptr).
-// We pass argv[1..argc-1] as the positional file/option list; out-of-range
-// positions return nullptr so the first nullptr terminates the list.
+// We pass argv[1..argc-1] as the positional file/option list, padded with
+// empty strings ("") up to 16384 slots, then explicit nullptr terminator.
 //
-// 16384-arg capacity supports batching every file from a single
-// CODEX-style FreeArc archive variant (~14k QB live-action fragments)
-// into one invocation. Important because FreeArc walks its archive
-// directory on every invocation -- batching amortises that cost.
+// Why "" and not nullptr for out-of-range? FreeArcExtract reads args
+// until the FIRST nullptr. _FreeArcExtract appears to expect FILE FILTER
+// args at specific positions past the command/archive, and gracefully
+// skips empty strings. Returning nullptr for out-of-range slots
+// terminates the list too early and causes _FreeArcExtract to misparse
+// the command line. This matches the v1.0.0 behaviour.
 
 int main(int argc, char* argv[])
 {
@@ -39,7 +41,7 @@ int main(int argc, char* argv[])
     }
     auto a = [&](int i) -> char*
     {
-        return i < argc ? argv[i] : nullptr;
+        return i < argc ? argv[i] : (char*)"";   // empty string, NOT nullptr
     };
     return FreeArcExtract(cbExtract,
         a(1), a(2), a(3), a(4), a(5), a(6), a(7), a(8), a(9), a(10), a(11), a(12), a(13), a(14),
